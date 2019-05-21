@@ -7,14 +7,14 @@ taxis = []
 passengers = []
 delivered_passengers = []
 
-SIM_TIME = 1000
+SIM_TIME = 100
 
-X_SIZE = 100
-Y_SIZE = 100
+X_SIZE = 20
+Y_SIZE = 20
 TAXI_CAP = 4
 NODES_LIMIT = 5
-N_PASSENGERS = 1000
-N_TAXI = 300
+N_PASSENGERS = 100
+N_TAXI = 10
 SHARING = True
 ACCEPTABLE_TRIP_LENGTH = 300
 DELAY_TOLERATION = 100
@@ -55,9 +55,9 @@ class Passenger:
                 self.time_out -= 1
         elif self.status == "Matched":
             self.waiting_time += 1
-            self.ride.occupance()
         elif self.status == "In Taxi":
             self.driving_time += 1
+            self.ride.occupance()
 
     def interact(self, taxi):
         if self.status == "Matched":
@@ -105,9 +105,11 @@ class Taxi:
         self.y_pos = randint(0, Y_SIZE)
         self.status = "Idle"
         self.occupance_count = 0
+        self.distance_driven = 0
         self.pairs = []
         self.nodes = []
         self.dest = None
+
 
     def step(self, _):
         if self.nodes:
@@ -148,6 +150,7 @@ class Taxi:
                 self.x_pos += 1
             else:
                 self.x_pos -= 1
+        self.distance_driven += 1
 
     # Returns expected time and path
     def expected_time(self, passenger, current_cost):
@@ -254,12 +257,14 @@ class Simulation:
         commuting_times = []
         for agent in delivered_passengers:
             commuting_times.append(agent.waiting_time + agent.driving_time)
-        print("Agents delivered: {} / {}".format(len(delivered_passengers), N_PASSENGERS))
+        total_distance_driven = sum([taxi.distance_driven for taxi in taxis])
+        print("Agents delivered: {} / {}, distance driven: {}".format(len(delivered_passengers), N_PASSENGERS, total_distance_driven))
         print("Travel time: average: {}, max: {}, std: {}".format(mean(commuting_times),
                                                                        max(commuting_times),
                                                                        stdev(commuting_times)))
         average_taxi_occupance = [(taxi.occupance_count/SIM_TIME) for taxi in taxis]
         print("Average taxi occupance = {}".format(mean(average_taxi_occupance)))
+
 
         print("Debug count: " + str(DEBUG_COUNT))
 
@@ -268,9 +273,10 @@ class Simulation:
             agent.step(time)
 
     def run(self):
+        mod = SIM_TIME / 100
         for time in range(SIM_TIME):
-            if time % 100 == 0:
-                print("Current time: " + str(time))
+            if time % mod == 0:
+                print("Current time: {}/{}".format(time, SIM_TIME))
             self.iter(time)
             # if type(agent) == Passenger and agent.id == DEBUG_ID:
             #     print( 'Current time: {} Agent {} will request on time {} pos {} at {}, waiting time = {}'.format(
