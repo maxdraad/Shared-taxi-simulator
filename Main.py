@@ -13,11 +13,12 @@ X_SIZE = 100
 Y_SIZE = 100
 TAXI_CAP = 4
 NODES_LIMIT = 5
-N_PASSENGERS = 3000
-N_TAXI = 200
-SHARING = True
+N_PASSENGERS = 300
+N_TAXI = 20
+SHARING = False
+ACCEPTABLE_TRIP_LENGTH = 300
 DELAY_TOLERATION = 100
-TIME_OUT_NO_MATCH = 5
+TIME_OUT_NO_MATCH = 20
 
 DEBUG_ID = 505
 DEBUG_COUNT = 0
@@ -33,9 +34,13 @@ class Passenger:
         self.status = "Idle"
         self.waiting_time = 0
         self.driving_time = 0
-        self.current_delay = 0
         self.goal = None
         self.time_out = 0
+        self.delay_toleration = self.determine_delay()
+
+    def determine_delay(self):
+        distance = Taxi.distance(self.orig, self.dest)
+        return 20 + distance*1.5
 
     def step(self, time):
         if time == self.request_time:
@@ -70,20 +75,21 @@ class Passenger:
             print("Passenger interaction not possible")
             return False
 
+    def delay(self, time):
+        self.delay_toleration -= time
+
+
     def find_taxi(self):
         current_time = float('Inf')
-        best_taxi = None
-        current_nodes = None
+        best_taxi, current_nodes, delays = None, None, None
         for taxi in taxis:
-            expected_time, nodes = taxi.expected_time(self, current_time)
-            if expected_time < current_time:
+            expected_time, nodes, delays = taxi.expected_time(self, current_time)
+            if expected_time < current_time and expected_time < ACCEPTABLE_TRIP_LENGTH:
                 current_time, best_taxi, current_nodes = expected_time, taxi, nodes
-
         if best_taxi:
-            # if len(current_nodes) > 2:
-            #     print("Sharing")
-            best_taxi.request(self, current_nodes)
+            best_taxi.request(self, current_nodes, delays)
             self.status = "Matched"
+            self.delay_toleration = self.delay_toleration - current_time
         else:
             self.time_out = TIME_OUT_NO_MATCH
 
@@ -107,9 +113,15 @@ class Taxi:
             #     print("Taxi 1 pos: [{}, {}]. Nodes: {}".format(self.x_pos, self.y_pos, self.nodes))
             self.drive()
 
-    def request(self, passenger, nodes):
+    def request(self, passenger, nodes, delays):
         self.pairs.append(passenger)
         self.nodes = nodes
+        if delays:
+            self.apply_delays(delays)
+
+    def apply_delays(self, delays):
+        for passenger in delays:
+            passenger[0].delay(passenger[1])
 
     def drive(self):
         if (self.x_pos, self.y_pos) == self.nodes[0][1]:
@@ -140,15 +152,15 @@ class Taxi:
         direct_distance = self.total_distance([(self.x_pos, self.y_pos), passenger.orig, passenger.dest])
         new_nodes = [(passenger, passenger.orig), (passenger, passenger.dest)]
         if len(self.nodes) == 0:
-            return direct_distance, new_nodes
+            return direct_distance, new_nodes, None
         elif len(self.nodes) <= 2 and not SHARING:
             route_after_passenger = self.total_distance(self.get_nodes_coordinates() + [(self.x_pos, self.y_pos)])
-            return route_after_passenger, (self.nodes + new_nodes)
+            return route_after_passenger, (self.nodes + new_nodes), None
         elif len(self.nodes) <= NODES_LIMIT and (direct_distance < current_cost) and SHARING:
             shortest_path = self.shortest_path(self.nodes, new_nodes)
             return shortest_path
         else:
-            return float('inf'), None
+            return float('inf'), None, None
 
     def get_pairs(self):
         pairs = []
@@ -167,22 +179,31 @@ class Taxi:
         current_route, current_distance = None, float('inf')
         pairs = self.get_pairs()
         pairs.append(new_nodes)
+        delay = None
         for new_route in Permute.permutations(current_nodes + new_nodes, pairs):
             destination_index = new_route.index(new_nodes[1])
-            # distance = self.total_distance(self.get_nodes_coordinates(new_route)[:destination_index])
-            distance = self.total_distance(self.get_nodes_coordinates(new_route))
-            # delay = self.delay(current_nodes[0][0], current_nodes, new_route)
+            distance = self.total_distance(self.get_nodes_coordinates(new_route)[:destination_index])
+            # distance = self.total_distance(self.get_nodes_coordinates(new_route)) #Old and incorrect version, better results
+            delay = self.delay(current_nodes, new_route)
             # print(delay)
-            if distance < current_distance: # and delay < DELAY_TOLERATION:
+            if distance < current_distance and delay:
                 current_distance = distance
                 current_route = new_route
-        return current_distance, current_route
+        return current_distance, current_route, delay
 
-    def delay(self, passenger, current_nodes, new_nodes):
-        idx = self.last_index(current_nodes, passenger)
-        idx2 = self.last_index(new_nodes, passenger)
-        return (self.total_distance(self.get_nodes_coordinates(new_nodes[:idx2])) -
-                self.total_distance(self.get_nodes_coordinates(current_nodes[:idx])))
+    def delay(self, current_nodes, new_nodes):
+        delays = []
+        for idx_current, node in enumerate(current_nodes):
+            if node[1] == node[0].dest:
+                idx_new = new_nodes.index(node)
+                passenger_delay = (self.total_distance(self.get_nodes_coordinates(new_nodes[:idx_new])) -
+                self.total_distance(self.get_nodes_coordinates(current_nodes[:idx_current])))
+                if passenger_delay > node[0].delay_toleration:
+                    return False
+                else:
+                    delays.append((node[0], passenger_delay))
+        return delays
+
 
     # As tuples
     def total_distance(self, points):
@@ -222,10 +243,10 @@ class Simulation:
         commuting_times = []
         for agent in delivered_passengers:
             commuting_times.append(agent.waiting_time + agent.driving_time)
-        print("Agents delivered: {} / {}".format(delivered_passengers, passengers))
-        print("Travel time: average: {}, max: {}, std: {}".format(mean(delivered_passengers),
-                                                                       max(delivered_passengers),
-                                                                       stdev(delivered_passengers)))
+        print("Agents delivered: {} / {}".format(len(delivered_passengers), N_PASSENGERS))
+        print("Travel time: average: {}, max: {}, std: {}".format(mean(commuting_times),
+                                                                       max(commuting_times),
+                                                                       stdev(commuting_times)))
 
         print("Debug count: " + str(DEBUG_COUNT))
 
