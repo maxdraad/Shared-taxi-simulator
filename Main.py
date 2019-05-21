@@ -13,9 +13,9 @@ X_SIZE = 100
 Y_SIZE = 100
 TAXI_CAP = 4
 NODES_LIMIT = 5
-N_PASSENGERS = 300
-N_TAXI = 20
-SHARING = False
+N_PASSENGERS = 1000
+N_TAXI = 300
+SHARING = True
 ACCEPTABLE_TRIP_LENGTH = 300
 DELAY_TOLERATION = 100
 TIME_OUT_NO_MATCH = 20
@@ -55,6 +55,7 @@ class Passenger:
                 self.time_out -= 1
         elif self.status == "Matched":
             self.waiting_time += 1
+            self.ride.occupance()
         elif self.status == "In Taxi":
             self.driving_time += 1
 
@@ -89,6 +90,7 @@ class Passenger:
         if best_taxi:
             best_taxi.request(self, current_nodes, delays)
             self.status = "Matched"
+            self.ride = best_taxi
             self.delay_toleration = self.delay_toleration - current_time
         else:
             self.time_out = TIME_OUT_NO_MATCH
@@ -102,8 +104,8 @@ class Taxi:
         self.x_pos = randint(0, X_SIZE)
         self.y_pos = randint(0, Y_SIZE)
         self.status = "Idle"
+        self.occupance_count = 0
         self.pairs = []
-
         self.nodes = []
         self.dest = None
 
@@ -154,7 +156,7 @@ class Taxi:
         if len(self.nodes) == 0:
             return direct_distance, new_nodes, None
         elif len(self.nodes) <= 2 and not SHARING:
-            route_after_passenger = self.total_distance(self.get_nodes_coordinates() + [(self.x_pos, self.y_pos)])
+            route_after_passenger = self.total_distance([(self.x_pos, self.y_pos)] + self.get_nodes_coordinates())
             return route_after_passenger, (self.nodes + new_nodes), None
         elif len(self.nodes) <= NODES_LIMIT and (direct_distance < current_cost) and SHARING:
             shortest_path = self.shortest_path(self.nodes, new_nodes)
@@ -174,7 +176,11 @@ class Taxi:
         else:
             return [x[1] for x in self.nodes]
 
+    def get_position(self):
+        return self.x_pos, self.y_pos
+
     # Constraint by tolerable delay of agents
+    # @profile
     def shortest_path(self, current_nodes, new_nodes):
         current_route, current_distance = None, float('inf')
         pairs = self.get_pairs()
@@ -182,22 +188,24 @@ class Taxi:
         delay = None
         for new_route in Permute.permutations(current_nodes + new_nodes, pairs):
             destination_index = new_route.index(new_nodes[1])
-            distance = self.total_distance(self.get_nodes_coordinates(new_route)[:destination_index])
+            distance = self.total_distance([(self.get_position())] +
+                                           self.get_nodes_coordinates(new_route)[:destination_index])
             # distance = self.total_distance(self.get_nodes_coordinates(new_route)) #Old and incorrect version, better results
-            delay = self.delay(current_nodes, new_route)
-            # print(delay)
-            if distance < current_distance and delay:
-                current_distance = distance
-                current_route = new_route
+            if distance < current_distance:
+                delay = self.compute_delays(current_nodes, new_route)
+                if delay:
+                    current_distance = distance
+                    current_route = new_route
         return current_distance, current_route, delay
 
-    def delay(self, current_nodes, new_nodes):
+    # @profile
+    def compute_delays(self, current_nodes, new_nodes):
         delays = []
         for idx_current, node in enumerate(current_nodes):
             if node[1] == node[0].dest:
                 idx_new = new_nodes.index(node)
-                passenger_delay = (self.total_distance(self.get_nodes_coordinates(new_nodes[:idx_new])) -
-                self.total_distance(self.get_nodes_coordinates(current_nodes[:idx_current])))
+                passenger_delay = (self.total_distance([(self.get_position())] + self.get_nodes_coordinates(new_nodes[:idx_new])) -
+                self.total_distance([(self.get_position())] + self.get_nodes_coordinates(current_nodes[:idx_current])))
                 if passenger_delay > node[0].delay_toleration:
                     return False
                 else:
@@ -211,6 +219,9 @@ class Taxi:
         for x in range(len(points) - 1):
             total += self.distance(points[x], points[x + 1])
         return total
+
+    def occupance(self):
+        self.occupance_count += 1
 
     @staticmethod
     def last_index(nodes, passenger):
@@ -247,6 +258,8 @@ class Simulation:
         print("Travel time: average: {}, max: {}, std: {}".format(mean(commuting_times),
                                                                        max(commuting_times),
                                                                        stdev(commuting_times)))
+        average_taxi_occupance = [(taxi.occupance_count/SIM_TIME) for taxi in taxis]
+        print("Average taxi occupance = {}".format(mean(average_taxi_occupance)))
 
         print("Debug count: " + str(DEBUG_COUNT))
 
