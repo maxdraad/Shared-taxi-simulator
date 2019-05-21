@@ -34,11 +34,11 @@ class Passenger:
         self.status = "Idle"
         self.waiting_time = 0
         self.driving_time = 0
-        self.goal = None
         self.time_out = 0
-        self.delay_toleration = self.determine_delay()
+        self.desired_travel_time = self.determine_travel_time()
+        self.delay_toleration = 0
 
-    def determine_delay(self):
+    def determine_travel_time(self):
         distance = Taxi.distance(self.orig, self.dest)
         return 20 + distance*1.5
 
@@ -64,7 +64,6 @@ class Passenger:
             if self.orig != (taxi.x_pos, taxi.y_pos):
                 print("Pickup: Taxi wrong location")
             self.status = "In Taxi"
-            self.goal = self.dest
             return True
         elif self.status == "In Taxi":
             if self.dest != (taxi.x_pos, taxi.y_pos):
@@ -91,7 +90,7 @@ class Passenger:
             best_taxi.request(self, current_nodes, delays)
             self.status = "Matched"
             self.ride = best_taxi
-            self.delay_toleration = self.delay_toleration - current_time
+            self.delay_toleration = self.desired_travel_time - current_time
         else:
             self.time_out = TIME_OUT_NO_MATCH
 
