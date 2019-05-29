@@ -13,13 +13,13 @@ SIM_TIME = 1000
 
 X_SIZE = 100
 Y_SIZE = 100
-TAXI_CAP = 4
+GRID_SIZE = X_SIZE * Y_SIZE
 NODES_LIMIT = 5
 N_PASSENGERS = 1000
-N_TAXI = 100
+N_TAXI = 50
 SHARING = False
 DELAY_TOLERATION = 100
-TIME_OUT_NO_MATCH = 1000
+TIME_OUT_NO_MATCH = 10
 
 DEBUG_ID = 505
 DEBUG_COUNT = 0
@@ -36,17 +36,18 @@ class Passenger:
         self.waiting_time = 0
         self.driving_time = 0
         self.time_out = 0
-        self.power = random.uniform(0.8, 1.2)
+        self.power = random.uniform(0.7, 1.1)
         self.desired_travel_time = self.determine_travel_time()
         self.desired_price = self.determine_price()
         self.delay_toleration = 0
+        self.delays = []
 
     def determine_travel_time(self):
         distance = Taxi.distance(self.orig, self.dest)
-        return 20/self.power + distance*1.5/self.power
+        return 20/self.power + distance*1.2/self.power
 
     def determine_price(self):
-        return Taxi.distance(self.orig, self.dest) * self.power
+        return Taxi.distance(self.orig, self.dest) * 1.2 * self.power
 
     def step(self, time):
         if time == self.request_time:
@@ -54,7 +55,7 @@ class Passenger:
             self.find_taxi()
             # print('Agent {} is requesting {}'.format(self.id, time))
         if self.status == "Requesting":
-            self.waiting_time += 1
+            # self.waiting_time += 1
             if self.time_out == 0:
                 self.find_taxi()
             else:
@@ -83,9 +84,7 @@ class Passenger:
 
     def delay(self, time):
         self.delay_toleration -= time
-        if (self.delay_toleration < 0):
-            print("Exceeding delay toleration!")
-
+        self.delays.append(time)
 
     def find_taxi(self):
         current_time = float('Inf')
@@ -106,9 +105,9 @@ class Passenger:
 class Taxi:
     def __init__(self, id):
         self.id = id
-        self.price_per_unit = 1
+        self.price_per_unit = random.uniform(0.8, 1.2)
         self.shared = SHARING
-        self.capacity = TAXI_CAP
+        self.nodes_limit = NODES_LIMIT
         self.x_pos = randint(0, X_SIZE)
         self.y_pos = randint(0, Y_SIZE)
         self.status = "Idle"
@@ -165,17 +164,16 @@ class Taxi:
 
     # Returns expected time and path
     def expected_length_price(self, passenger, current_cost):
-        direct_distance = self.total_distance([(self.x_pos, self.y_pos), passenger.orig, passenger.dest])
+        direct_distance = self.total_distance([(self.x_pos, self.y_pos)] + self.get_nodes_coordinates(self.nodes) +
+                                              [passenger.orig, passenger.dest])
         trip_distance = self.distance(passenger.orig, passenger.dest)
         price = self.compute_price(trip_distance)
         new_nodes = [(passenger, passenger.orig), (passenger, passenger.dest)]
-        if len(self.nodes) == 0:
+        if not self.nodes:
             return direct_distance, new_nodes, None, price
-        elif len(self.nodes) <= 2 and not self.shared:
-            route_after_passenger = self.total_distance([(self.x_pos, self.y_pos)] + self.get_nodes_coordinates() +
-                                                        [passenger.orig, passenger.dest])
-            return route_after_passenger, (self.nodes + new_nodes), None, price
-        elif len(self.nodes) <= NODES_LIMIT and (direct_distance < current_cost) and self.shared:
+        if not self.shared and len(self.nodes) <= 2:
+            return direct_distance, (self.nodes + new_nodes), None, price
+        elif self.shared and len(self.nodes) <= self.nodes_limit and (direct_distance < current_cost):
             shortest_path = self.shortest_path(self.nodes, new_nodes, current_cost)
             return (*shortest_path, price)
         else:
@@ -195,12 +193,6 @@ class Taxi:
             pairs.append([(passenger, passenger.orig), (passenger, passenger.dest)])
         return pairs
 
-    def get_nodes_coordinates(self, nodes=[]):
-        if nodes:
-            return [x[1] for x in nodes]
-        else:
-            return [x[1] for x in self.nodes]
-
     def get_position(self):
         return self.x_pos, self.y_pos
 
@@ -212,7 +204,7 @@ class Taxi:
         pairs.append(new_nodes)
         for new_route in Permute.permutations(current_nodes + new_nodes, pairs):
             destination_index = new_route.index(new_nodes[1])
-            route_to_destination = [(self.get_position())] + self.get_nodes_coordinates(new_route)[:destination_index]
+            route_to_destination = [(self.get_position())] + self.get_nodes_coordinates(new_route)[:destination_index + 1]
             distance = self.total_distance(route_to_destination)
             if distance < current_distance:
                 delay = self.compute_delays(current_nodes, new_route)
@@ -228,11 +220,13 @@ class Taxi:
             if node[1] == node[0].dest:
                 idx_new = new_nodes.index(node)
 
-                current_time = self.total_distance([(self.get_position())] + self.get_nodes_coordinates(current_nodes[:idx_current+1]))
-                new_time = self.total_distance([(self.get_position())] + self.get_nodes_coordinates(new_nodes[:idx_new+1]))
+                current_time = self.total_distance([(self.get_position())] +
+                                                   self.get_nodes_coordinates(current_nodes[:idx_current+1]))
+                new_time = self.total_distance([(self.get_position())] +
+                                               self.get_nodes_coordinates(new_nodes[:idx_new+1]))
                 passenger_delay = new_time - current_time
 
-                # print("entry")
+                # print("Debug statements taxi _______________")
                 # print(self.get_position())
                 # print(node)
                 # print(current_nodes)
@@ -257,6 +251,10 @@ class Taxi:
 
     def occupance(self):
         self.occupance_count += 1
+
+    @staticmethod
+    def get_nodes_coordinates(nodes):
+        return [x[1] for x in nodes]
 
     @staticmethod
     def last_index(nodes, passenger):
@@ -289,12 +287,13 @@ class Simulation:
         commuting_times = []
         for agent in delivered_passengers:
             commuting_times.append(agent.driving_time)
-            print("Passenger desired time: {}, actual waiting + driving time {}".format(agent.desired_travel_time, agent.driving_time+agent.waiting_time))
+            print("Passenger desired time: {}, actual waiting ({}) + driving ({}) time {}, delays : {}".format(
+                agent.desired_travel_time, agent.driving_time, agent.waiting_time,
+                agent.driving_time+agent.waiting_time, agent.delays))
         total_distance_driven = sum([taxi.distance_driven for taxi in taxis])
         earnings = sum([taxi.earnings for taxi in taxis])
         print("Agents delivered: {} / {}, distance driven: {}, earnings: {}".format(len(delivered_passengers),
-                                                                                    N_PASSENGERS, total_distance_driven,
-                                                                                    earnings))
+            N_PASSENGERS, total_distance_driven, earnings))
         print("Driving time: average: {}, max: {}, std: {}".format(mean(commuting_times),
                                                                        max(commuting_times),
                                                                        stdev(commuting_times)))
