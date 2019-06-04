@@ -7,7 +7,15 @@ from Passenger import Passenger
 from Taxi import Taxi
 
 class Simulation:
-    def __init__(self):
+    def __init__(self, sim_time = SIM_TIME, n_taxi=N_TAXI, n_passengers=N_PASSENGERS, sharing_rate=SHARING_RATE, nodes_limit = NODES_LIMIT):
+        self.n_passengers = n_passengers
+        self.n_taxi = n_taxi
+        self.sharing_rate = sharing_rate
+        self.n_public = round(self.n_taxi * self.sharing_rate)
+        self.n_private = round(self.n_taxi * (1 - self.sharing_rate))
+        self.nodes_limit = nodes_limit
+
+        self.sim_time = sim_time
         self.taxis = self.init_taxis()
         self.passengers = self.init_passengers()
         self.delivered_passengers = []
@@ -15,20 +23,32 @@ class Simulation:
 
     def init_passengers(self):
         passengers = []
-        for x in range(N_PASSENGERS):
+        for x in range(self.n_passengers):
             passengers.append(Passenger(x, self))
         return passengers
 
     def init_taxis(self):
         taxis = []
-        for x in range(N_PUBLIC):
+        for x in range(self.n_public):
             taxis.append(Taxi(x, True))
-        for x in range(N_PRIVATE):
+        for x in range(self.n_private):
             taxis.append(Taxi(x, False))
         return taxis
 
-    def end_statements(self):
-        print("Simulation finished (Sharing rate: {})".format(SHARING_RATE))
+    def print_statistics(self, commuting_times, total_distance_driven, earnings, average_taxi_occupance):
+        print("Simulation finished (Sharing rate: {})".format(self.sharing_rate))
+        print("Agents delivered: {} / {}, distance driven: {}, earnings: {}".format(len(self.delivered_passengers),
+            self.n_passengers, total_distance_driven, earnings))
+        print("Driving time: average: {}, max: {}, std: {}".format(mean(commuting_times),
+                                                                       max(commuting_times),
+                                                                       stdev(commuting_times)))
+        print("Average taxi occupance = {}".format(mean(average_taxi_occupance)))
+        print("Debug count: " + str(DEBUG_COUNT))
+
+    def results(self):
+        for passenger in self.passengers:
+            if passenger.status == "Delivered":
+                self.delivered_passengers.append(passenger)
         commuting_times = []
         for agent in self.delivered_passengers:
             commuting_times.append(agent.driving_time)
@@ -37,22 +57,15 @@ class Simulation:
         #         agent.driving_time+agent.waiting_time, agent.delays))
         total_distance_driven = sum([taxi.distance_driven for taxi in self.taxis])
         earnings = sum([taxi.earnings for taxi in self.taxis])
-        print("Agents delivered: {} / {}, distance driven: {}, earnings: {}".format(len(self.delivered_passengers),
-            N_PASSENGERS, total_distance_driven, earnings))
-        print("Driving time: average: {}, max: {}, std: {}".format(mean(commuting_times),
-                                                                       max(commuting_times),
-                                                                       stdev(commuting_times)))
-        average_taxi_occupance = [(taxi.occupance_count/SIM_TIME) for taxi in self.taxis]
-        print("Average taxi occupance = {}".format(mean(average_taxi_occupance)))
+        average_taxi_occupance = [(taxi.occupance_count/self.sim_time) for taxi in self.taxis]
+        return commuting_times, total_distance_driven, earnings, average_taxi_occupance
 
 
-        print("Debug count: " + str(DEBUG_COUNT))
 
     def end_simulation(self):
-        for passenger in self.passengers:
-            if passenger.status == "Delivered":
-                self.delivered_passengers.append(passenger)
-        self.end_statements()
+
+        commuting_times, total_distance_driven, earnings, average_taxi_occupance = self.results()
+        self.print_statistics(commuting_times, total_distance_driven, earnings, average_taxi_occupance)
 
     def iter(self, time):
         for agent in self.passengers + self.taxis:
@@ -68,7 +81,7 @@ class Simulation:
         mod = SIM_TIME / 100
         for time in range(SIM_TIME):
             if time % mod == 0:
-                print("Current time: {}/{}".format(time, SIM_TIME))
+                print("Current time: {}/{}".format(time, self.sim_time))
             self.iter(time)
             # if type(agent) == Passenger and agent.id == DEBUG_ID:
             #     print( 'Current time: {} Agent {} will request on time {} pos {} at {}, waiting time = {}'.format(
