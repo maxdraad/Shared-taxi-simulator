@@ -4,8 +4,9 @@ from Globals import *
 from Taxi import Taxi
 
 class Passenger:
-    def __init__(self, id):
+    def __init__(self, id, simulation):
         self.id = id
+        self.simulation = simulation
         self.orig = (randint(0, X_SIZE), randint(0, Y_SIZE))
         self.dest = (randint(0, X_SIZE), randint(0, Y_SIZE))
         self.request_time = randint(0, SIM_TIME - MAX_DISTANCE)
@@ -54,7 +55,6 @@ class Passenger:
             if self.dest != (taxi.x_pos, taxi.y_pos):
                 print("Dropoff: Taxi wrong location")
             self.status = "Delivered"
-            delivered_passengers.append(self)
             return False
         else:
             print("Passenger interaction not possible")
@@ -67,7 +67,7 @@ class Passenger:
     def find_taxi(self):
         current_time = float('Inf')
         best_taxi, current_nodes, current_delays, current_price = None, None, None, float('inf')
-        for taxi in taxis:
+        for taxi in self.simulation.taxis:
             expected_time, nodes, delays, price = taxi.find_best_route(self, current_time)
             if expected_time < current_time and expected_time < self.desired_travel_time and price < self.desired_price:
                 current_time, best_taxi, current_nodes, current_delays, current_price = expected_time, taxi, nodes, delays, price

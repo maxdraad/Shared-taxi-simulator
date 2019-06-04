@@ -8,47 +8,59 @@ from Taxi import Taxi
 
 class Simulation:
     def __init__(self):
-        self.init_passengers()
-        self.init_taxis()
+        self.taxis = self.init_taxis()
+        self.passengers = self.init_passengers()
+        self.delivered_passengers = []
+
 
     def init_passengers(self):
+        passengers = []
         for x in range(N_PASSENGERS):
-            passengers.append(Passenger(x))
+            passengers.append(Passenger(x, self))
+        return passengers
 
     def init_taxis(self):
+        taxis = []
         for x in range(N_PUBLIC):
             taxis.append(Taxi(x, True))
         for x in range(N_PRIVATE):
             taxis.append(Taxi(x, False))
+        return taxis
 
     def end_statements(self):
         print("Simulation finished (Sharing rate: {})".format(SHARING_RATE))
         commuting_times = []
-        for agent in delivered_passengers:
+        for agent in self.delivered_passengers:
             commuting_times.append(agent.driving_time)
         #     print("Passenger desired time: {}, actual waiting ({}) + driving ({}) time {}, delays : {}".format(
         #         agent.desired_travel_time, agent.driving_time, agent.waiting_time,
         #         agent.driving_time+agent.waiting_time, agent.delays))
-        total_distance_driven = sum([taxi.distance_driven for taxi in taxis])
-        earnings = sum([taxi.earnings for taxi in taxis])
-        print("Agents delivered: {} / {}, distance driven: {}, earnings: {}".format(len(delivered_passengers),
+        total_distance_driven = sum([taxi.distance_driven for taxi in self.taxis])
+        earnings = sum([taxi.earnings for taxi in self.taxis])
+        print("Agents delivered: {} / {}, distance driven: {}, earnings: {}".format(len(self.delivered_passengers),
             N_PASSENGERS, total_distance_driven, earnings))
         print("Driving time: average: {}, max: {}, std: {}".format(mean(commuting_times),
                                                                        max(commuting_times),
                                                                        stdev(commuting_times)))
-        average_taxi_occupance = [(taxi.occupance_count/SIM_TIME) for taxi in taxis]
+        average_taxi_occupance = [(taxi.occupance_count/SIM_TIME) for taxi in self.taxis]
         print("Average taxi occupance = {}".format(mean(average_taxi_occupance)))
 
 
         print("Debug count: " + str(DEBUG_COUNT))
 
+    def end_simulation(self):
+        for passenger in self.passengers:
+            if passenger.status == "Delivered":
+                self.delivered_passengers.append(passenger)
+        self.end_statements()
+
     def iter(self, time):
-        for agent in passengers + taxis:
+        for agent in self.passengers + self.taxis:
             agent.step(time)
 
     def iter_parralel(self, time):
         num_cores = multiprocessing.cpu_count()
-        Parallel(n_jobs=num_cores)(delayed(agent.step)(time) for agent in passengers+taxis)
+        Parallel(n_jobs=num_cores)(delayed(agent.step)(time) for agent in self.passengers + self.taxis)
 
 
 
@@ -61,7 +73,8 @@ class Simulation:
             # if type(agent) == Passenger and agent.id == DEBUG_ID:
             #     print( 'Current time: {} Agent {} will request on time {} pos {} at {}, waiting time = {}'.format(
             #         time, agent.id, agent.request_time, agent.status, agent.orig, (agent.waiting_time+agent.driving_time)))
-        self.end_statements()
+        self.end_simulation()
+
 
 
 sim = Simulation()

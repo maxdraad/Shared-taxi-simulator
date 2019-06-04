@@ -1,10 +1,6 @@
-taxis = []
-passengers = []
-delivered_passengers = []
-
 SIM_TIME = 1000
-X_SIZE = 100
-Y_SIZE = 100
+X_SIZE = 157
+Y_SIZE = 157
 GRID_SIZE = X_SIZE * Y_SIZE
 MAX_DISTANCE = X_SIZE + Y_SIZE
 
@@ -13,7 +9,7 @@ DELAY_TOLERATION = 100
 TIME_OUT_NO_MATCH = 10
 
 N_TAXI = 75
-SHARING_RATE = 0
+SHARING_RATE = 0.5
 NODES_LIMIT = 5
 N_PUBLIC = round(N_TAXI * SHARING_RATE)
 N_PRIVATE = round(N_TAXI * (1 - SHARING_RATE))
