@@ -1,35 +1,44 @@
 import random
+import numpy.random as npr
 from random import randint
 import Permute
 from Globals import *
 
 class Taxi:
-    def __init__(self, id, shared):
+    def __init__(self, id, shared, nodes_limit, max_passengers = MAX_PASSENGERS):
         self.id = id
-        self.price_per_unit = random.uniform(0.8, 1.2)
         self.shared = shared
-        self.nodes_limit = NODES_LIMIT
+        self.max_passengers = max_passengers
+        self.price_per_unit = npr.normal(1, 0.05)
+        self.nodes_limit = nodes_limit
         self.x_pos = randint(0, X_SIZE)
         self.y_pos = randint(0, Y_SIZE)
         self.status = "Idle"
         self.occupance_count = 0
         self.distance_driven = 0
         self.pickups = []
-        self.deliveries = []
+        self.passengers = []
         self.nodes = []
         self.dest = None
         self.earnings = 0
 
 
     def step(self, time):
-        if time > SIM_TIME * 0.1:
-            self.compute_price_per_unit(time)
+        self.compute_price_per_unit(time)
         if self.nodes:
-            # if self.id == 1:
-            #     print("Taxi 1 pos: [{}, {}]. Nodes: {}".format(self.x_pos, self.y_pos, self.nodes))
-            self.drive()
+            if (self.x_pos, self.y_pos) == self.nodes[0][1]:
+                passenger = self.nodes[0][0]
+                action = passenger.interact(self)
+                if action == "In Taxi":
+                    self.pickups.remove(passenger)
+                    self.passengers.append(passenger)
+                elif action == "Delivered":
+                    self.passengers.remove(passenger)
+                del self.nodes[0]
+            else:
+                self.drive(self.nodes[0][1])
         else:
-            self.move((randint(0, X_SIZE), randint(0, Y_SIZE)))
+            self.drive((randint(0, X_SIZE), randint(0, Y_SIZE)))
 
     def request(self, passenger, nodes, delays, price):
         self.pickups.append(passenger)
@@ -43,16 +52,8 @@ class Taxi:
         for passenger in delays:
             passenger[0].delay(passenger[1])
 
-    def drive(self):
-        if (self.x_pos, self.y_pos) == self.nodes[0][1]:
-            pickup = self.nodes[0][0].interact(self)
-            if pickup:
-                self.pickups.remove(self.nodes[0][0])
-            del self.nodes[0]
-        else:
-            self.move(self.nodes[0][1])
 
-    def move(self, des):
+    def drive(self, des):
         if abs(self.x_pos == des[0]):
             if abs(self.y_pos != des[1]):
                 if self.y_pos < des[1]:
@@ -87,9 +88,10 @@ class Taxi:
         return distance * self.price_per_unit
 
     def compute_price_per_unit(self, time):
-        average_occupance = (self.occupance_count/time)
-        if average_occupance > 1:
-            self.price_per_unit = (1 / average_occupance)
+        if time > SIM_TIME * 0.1 and time % 10 == 0:
+            average_occupance = (self.occupance_count/time)
+            if average_occupance > 1:
+                self.price_per_unit = (1 / average_occupance*1.1)
 
     def get_pairs(self):
         pairs = []
@@ -103,7 +105,7 @@ class Taxi:
     # Constraint by tolerable delay of agents
     # @profile
     def shortest_path(self, current_nodes, new_nodes, current_distance):
-        current_route, current_delay = None, None
+        current_route, current_delays = None, None
         pairs = self.get_pairs()
         pairs.append(new_nodes)
         for new_route in Permute.permutations(current_nodes + new_nodes, pairs):
@@ -111,10 +113,22 @@ class Taxi:
             route_to_destination = [(self.get_position())] + self.get_nodes_coordinates(new_route)[:destination_index + 1]
             distance = self.total_distance(route_to_destination)
             if distance < current_distance:
-                delay = self.compute_delays(current_nodes, new_route)
-                if delay:
-                    current_distance, current_route, current_delay = distance, new_route, delay
-        return current_distance, current_route, current_delay
+                delays = self.compute_delays(current_nodes, new_route)
+                max_passengers = True
+                if delays and max_passengers and sum(self.get_nodes_coordinates(delays)) < (current_distance - distance):
+                    current_distance, current_route, current_delays = distance, new_route, delays
+        return current_distance, current_route, current_delays
+
+    def compute_max_passengers(self, new_route):
+        virtual_passenger_count = len(self.passengers)
+        for node in new_route:
+            if node[1] == node[0].dest:
+                virtual_passenger_count -= 1
+            else:
+                virtual_passenger_count += 1
+            if virtual_passenger_count > self.max_passengers:
+                return False
+        return True
 
     # @profile
     def compute_delays(self, current_nodes, new_nodes):
@@ -159,4 +173,6 @@ class Taxi:
     @staticmethod
     def between(point1, point2, point3):
         return point1[0] < point3[0] < point2[0] and point1[1] < point3[1] < point2[1]
+
+
 
