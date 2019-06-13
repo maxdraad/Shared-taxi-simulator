@@ -14,14 +14,13 @@ class Taxi:
         self.x_pos = randint(0, X_SIZE)
         self.y_pos = randint(0, Y_SIZE)
         self.status = "Idle"
-        self.occupance_count = 0
+        self.occupancy_count = 0
         self.distance_driven = 0
         self.pickups = []
         self.passengers = []
         self.nodes = []
         self.dest = None
         self.earnings = 0
-
 
     def step(self, time):
         self.compute_price_per_unit(time)
@@ -39,19 +38,6 @@ class Taxi:
                 self.drive(self.nodes[0][1])
         else:
             self.drive((randint(0, X_SIZE), randint(0, Y_SIZE)))
-
-    def request(self, passenger, nodes, delays, price):
-        self.pickups.append(passenger)
-        self.nodes = nodes
-        if delays:
-            self.apply_delays(delays)
-        self.earnings += price
-
-    @staticmethod
-    def apply_delays(delays):
-        for passenger in delays:
-            passenger[0].delay(passenger[1])
-
 
     def drive(self, des):
         if abs(self.x_pos == des[0]):
@@ -84,25 +70,6 @@ class Taxi:
         else:
             return float('inf'), None, None, float('inf')
 
-    def compute_price(self, distance):
-        return distance * self.price_per_unit
-
-    def compute_price_per_unit(self, time):
-        if time > SIM_TIME * 0.1 and time % 10 == 0:
-            average_occupance = (self.occupance_count/time)
-            if average_occupance > 1:
-                self.price_per_unit = (1 / average_occupance*1.1)
-
-    def get_pairs(self):
-        pairs = []
-        for passenger in self.pickups:
-            pairs.append([(passenger, passenger.orig), (passenger, passenger.dest)])
-        return pairs
-
-    def get_position(self):
-        return self.x_pos, self.y_pos
-
-    # Constraint by tolerable delay of agents
     # @profile
     def shortest_path(self, current_nodes, new_nodes, current_distance):
         current_route, current_delays = None, None
@@ -147,16 +114,44 @@ class Taxi:
                     delays.append((node[0], passenger_delay))
         return delays
 
+    def request(self, passenger, nodes, delays, price):
+        self.pickups.append(passenger)
+        self.nodes = nodes
+        if delays:
+            self.apply_delays(delays)
+        self.earnings += price
 
-    # As tuples
     def total_distance(self, points):
         total = 0
         for x in range(len(points) - 1):
             total += self.distance(points[x], points[x + 1])
         return total
 
-    def occupance(self):
-        self.occupance_count += 1
+    def occupancy(self):
+        self.occupancy_count += 1
+
+    def compute_price(self, distance):
+        return distance * self.price_per_unit
+
+    def compute_price_per_unit(self, time):
+        if time > SIM_TIME * 0.1 and time % 10 == 0:
+            average_occupancy = (self.occupancy_count / time)
+            if average_occupancy > 1:
+                self.price_per_unit = (1 / average_occupancy * 1.1)
+
+    def get_pairs(self):
+        pairs = []
+        for passenger in self.pickups:
+            pairs.append([(passenger, passenger.orig), (passenger, passenger.dest)])
+        return pairs
+
+    def get_position(self):
+        return self.x_pos, self.y_pos
+
+    @staticmethod
+    def apply_delays(delays):
+        for passenger in delays:
+            passenger[0].delay(passenger[1])
 
     @staticmethod
     def get_nodes_coordinates(nodes):

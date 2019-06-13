@@ -41,14 +41,14 @@ class Simulation:
             taxis.append(Taxi(x, False, NODES_LIMIT))
         return taxis
 
-    def print_statistics(self, commuting_times, total_distance_driven, earnings, average_taxi_occupance):
+    def print_statistics(self, commuting_times, total_distance_driven, earnings, average_taxi_occupancy):
         print("Simulation finished (Sharing rate: {})".format(self.sharing_rate))
         print("Agents delivered: {} / {}, distance driven: {}, earnings: {}".format(len(self.delivered_passengers),
             self.n_passengers, total_distance_driven, earnings))
         print("Driving time: average: {}, max: {}, std: {}".format(mean(commuting_times),
                                                                        max(commuting_times),
                                                                        stdev(commuting_times)))
-        print("Average taxi occupance = {}".format(mean(average_taxi_occupance)))
+        print("Average taxi occupancy = {}".format(mean(average_taxi_occupancy)))
         print("Debug count: " + str(DEBUG_COUNT))
 
     def results(self):
@@ -63,23 +63,15 @@ class Simulation:
         #         agent.driving_time+agent.waiting_time, agent.delays))
         total_distance_driven = sum([taxi.distance_driven for taxi in self.taxis])
         earnings = sum([taxi.earnings for taxi in self.taxis])
-        average_taxi_occupance = [(taxi.occupance_count/self.sim_time) for taxi in self.taxis]
-        return commuting_times, total_distance_driven, earnings, average_taxi_occupance
+        average_taxi_occupancy = [(taxi.occupancy_count/self.sim_time) for taxi in self.taxis]
+        return commuting_times, total_distance_driven, earnings, average_taxi_occupancy
 
 
 
     def end_simulation(self):
-
-        commuting_times, total_distance_driven, earnings, average_taxi_occupance = self.results()
-        self.print_statistics(commuting_times, total_distance_driven, earnings, average_taxi_occupance)
-
-        # f = open('results.csv', 'a')
-        # f.write('{},{},{},{},{},'.format(self.sim_time, self.n_passengers, self.n_taxi, self.sharing_rate, self.nodes_limit))
-        # f.write('{},{},{},{},{},{}\n'.format(mean(commuting_times), max(commuting_times), stdev(commuting_times),
-        #                                      total_distance_driven, earnings, mean(average_taxi_occupance)))
-        # f.close()
-
-        return len(self.delivered_passengers), mean(commuting_times), max(commuting_times), stdev(commuting_times), total_distance_driven, earnings, mean(average_taxi_occupance)
+        commuting_times, total_distance_driven, earnings, average_taxi_occupancy = self.results()
+        self.print_statistics(commuting_times, total_distance_driven, earnings, average_taxi_occupancy)
+        return len(self.delivered_passengers), mean(commuting_times), max(commuting_times), stdev(commuting_times), total_distance_driven, earnings, mean(average_taxi_occupancy)
 
     def iter(self, time):
         for agent in self.passengers + self.taxis:

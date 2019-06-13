@@ -18,40 +18,18 @@ class Passenger:
         self.waiting_time = 0
         self.driving_time = 0
         self.time_out = 0
-        self.time_out_count = 0
+        self.time_outs_count = 0
         self.power = npr.normal(1, 0.05)
         self.desired_travel_time = self.determine_travel_time()
         self.desired_price = self.determine_price()
         self.delay_toleration = 0
         self.delays = []
 
-    def generate_route(self):
-        origin_center = random.choice([True, False])
-        center = (round(npr.normal(X_SIZE/2, X_SIZE/25)), round(npr.normal(Y_SIZE/2, Y_SIZE/25)))
-        rand = (randint(0, X_SIZE), randint(0, Y_SIZE))
-        if origin_center:
-            return center, rand
-        else:
-            return rand, center
-
-
-
-
-
-    def determine_travel_time(self):
-        distance = Taxi.distance(self.orig, self.dest)
-        return (MAX_DISTANCE/2) / self.power + distance / self.power
-
-    def determine_price(self):
-        return Taxi.distance(self.orig, self.dest) * self.power
-
     def step(self, time):
-        if time == self.request_time and self.time_out_count < TIME_OUT_LIMIT:
+        if time == self.request_time:
             self.status = "Requesting"
             self.find_taxi()
-            # print('Agent {} is requesting {}'.format(self.id, time))
-        if self.status == "Requesting":
-            # self.waiting_time += 1
+        elif self.status == "Requesting" and self.time_outs_count < MAX_TIME_OUTS:
             if self.time_out == 0:
                 self.find_taxi()
             else:
@@ -60,7 +38,22 @@ class Passenger:
             self.waiting_time += 1
         elif self.status == "In Taxi":
             self.driving_time += 1
-            self.ride.occupance()
+            self.ride.occupancy()
+
+    def find_taxi(self):
+        best_taxi, current_nodes, current_delays, current_price, current_time = None, None, None, float('inf'), float('Inf')
+        for taxi in self.simulation.taxis:
+            expected_time, nodes, delays, price = taxi.find_best_route(self, current_time)
+            if expected_time < current_time and expected_time < self.desired_travel_time and price < self.desired_price:
+                current_time, best_taxi, current_nodes, current_delays, current_price = expected_time, taxi, nodes, delays, price
+        if best_taxi:
+            best_taxi.request(self, current_nodes, current_delays, current_price)
+            self.delay_toleration = self.desired_travel_time - current_time
+            self.status = "Matched"
+            self.ride = best_taxi
+        else:
+            self.time_out = TIME_OUT
+            self.time_outs_count += 1
 
     def interact(self, taxi):
         if self.status == "Matched":
@@ -81,17 +74,18 @@ class Passenger:
         self.delay_toleration -= time
         self.delays.append(time)
 
-    def find_taxi(self):
-        best_taxi, current_nodes, current_delays, current_price, current_time = None, None, None, float('inf'), float('Inf')
-        for taxi in self.simulation.taxis:
-            expected_time, nodes, delays, price = taxi.find_best_route(self, current_time)
-            if expected_time < current_time and expected_time < self.desired_travel_time and price < self.desired_price:
-                current_time, best_taxi, current_nodes, current_delays, current_price = expected_time, taxi, nodes, delays, price
-        if best_taxi:
-            best_taxi.request(self, current_nodes, current_delays, current_price)
-            self.delay_toleration = self.desired_travel_time - current_time
-            self.status = "Matched"
-            self.ride = best_taxi
+    def determine_travel_time(self):
+        distance = Taxi.distance(self.orig, self.dest)
+        return (MAX_DISTANCE / 2) / self.power + distance / self.power
+
+    def determine_price(self):
+        return Taxi.distance(self.orig, self.dest) * self.power
+
+    @staticmethod
+    def generate_route():
+        centered_loc = (round(npr.normal(X_SIZE / 2, X_SIZE / 25)), round(npr.normal(Y_SIZE / 2, Y_SIZE / 25)))
+        uniform_loc = (randint(0, X_SIZE), randint(0, Y_SIZE))
+        if random.choice([True, False]):
+            return centered_loc, uniform_loc
         else:
-            self.time_out = TIME_OUT_NO_MATCH
-            self.time_out_count += 1
+            return uniform_loc, centered_loc
