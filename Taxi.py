@@ -5,12 +5,11 @@ import Permute
 from Globals import *
 
 class Taxi:
-    def __init__(self, id, shared, nodes_limit, max_passengers = MAX_PASSENGERS):
+    def __init__(self, id, max_passengers):
         self.id = id
-        self.shared = shared
         self.max_passengers = max_passengers
+        self.nodes_limit = self.get_nodes_limit_from_passenger_limit(max_passengers)
         self.price_per_unit = npr.normal(1, 0.05)
-        self.nodes_limit = nodes_limit
         self.x_pos = randint(0, X_SIZE)
         self.y_pos = randint(0, Y_SIZE)
         self.status = "Idle"
@@ -23,7 +22,8 @@ class Taxi:
         self.earnings = 0
 
     def step(self, time):
-        self.compute_price_per_unit(time)
+        if time > SIM_TIME * 0.1 and time % 10 == 0:
+            self.compute_price_per_unit(time)
         if self.nodes:
             if (self.x_pos, self.y_pos) == self.nodes[0][1]:
                 passenger = self.nodes[0][0]
@@ -36,6 +36,7 @@ class Taxi:
                 del self.nodes[0]
             else:
                 self.drive(self.nodes[0][1])
+                self.distance_driven += 1
         else:
             self.drive((randint(0, X_SIZE), randint(0, Y_SIZE)))
 
@@ -51,7 +52,6 @@ class Taxi:
                 self.x_pos += 1
             else:
                 self.x_pos -= 1
-        self.distance_driven += 1
 
     # Returns expected time and path
     def find_best_route(self, passenger, current_cost):
@@ -62,9 +62,9 @@ class Taxi:
         new_nodes = [(passenger, passenger.orig), (passenger, passenger.dest)]
         if not self.nodes:
             return direct_distance, new_nodes, None, price
-        if not self.shared and len(self.nodes) <= 2:
+        if self.max_passengers == 1 and len(self.nodes) <= 2:
             return direct_distance, (self.nodes + new_nodes), None, price
-        elif self.shared and len(self.nodes) <= self.nodes_limit and (direct_distance < current_cost):
+        elif self.max_passengers > 1 and len(self.nodes) <= self.nodes_limit and (direct_distance < current_cost):
             shortest_path = self.shortest_path(self.nodes, new_nodes, current_cost)
             return (*shortest_path, price)
         else:
@@ -134,10 +134,9 @@ class Taxi:
         return distance * self.price_per_unit
 
     def compute_price_per_unit(self, time):
-        if time > SIM_TIME * 0.1 and time % 10 == 0:
-            average_occupancy = (self.occupancy_count / time)
-            if average_occupancy > 1:
-                self.price_per_unit = (1 / average_occupancy * 1.1)
+        average_occupancy = (self.occupancy_count / time)
+        if average_occupancy > 1:
+            self.price_per_unit = (1 / average_occupancy * 1.1)
 
     def get_pairs(self):
         pairs = []
@@ -147,6 +146,11 @@ class Taxi:
 
     def get_position(self):
         return self.x_pos, self.y_pos
+
+    @staticmethod
+    def get_nodes_limit_from_passenger_limit(passenger_limit):
+        passenger_node_map = {1:2, 2:5, 3:5, 4:7, 5:7, 6:8, 7:8, 8:10}
+        return passenger_node_map[passenger_limit]
 
     @staticmethod
     def apply_delays(delays):

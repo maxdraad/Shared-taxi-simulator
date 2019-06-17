@@ -6,14 +6,13 @@ from Taxi import Taxi
 
 
 class Passenger:
-    def __init__(self, id, simulation):
+    def __init__(self, id, simulation, routes_centered=False, time_centered=False):
         self.id = id
         self.simulation = simulation
-        # self.orig = (randint(0, X_SIZE), randint(0, Y_SIZE))
-        # self.dest = (randint(0, X_SIZE), randint(0, Y_SIZE))
-        self.orig, self.dest = self.generate_route()
-        self.request_time = randint(0, SIM_TIME - MAX_DISTANCE)
+        self.orig, self.dest = self.generate_route(routes_centered)
+        self.request_time = self.generate_time(time_centered)
         self.ride = False
+        self.ride_price = None
         self.status = "Idle"
         self.waiting_time = 0
         self.driving_time = 0
@@ -51,6 +50,7 @@ class Passenger:
             self.delay_toleration = self.desired_travel_time - current_time
             self.status = "Matched"
             self.ride = best_taxi
+            self.ride_price = current_price
         else:
             self.time_out = TIME_OUT
             self.time_outs_count += 1
@@ -76,16 +76,29 @@ class Passenger:
 
     def determine_travel_time(self):
         distance = Taxi.distance(self.orig, self.dest)
-        return (MAX_DISTANCE / 2) / self.power + distance / self.power
+        return ((MAX_DISTANCE * 0.1) + (1.5 * distance)) / self.power
 
     def determine_price(self):
-        return Taxi.distance(self.orig, self.dest) * self.power
+        return Taxi.distance(self.orig, self.dest) * 1.2 * self.power
 
     @staticmethod
-    def generate_route():
-        centered_loc = (round(npr.normal(X_SIZE / 2, X_SIZE / 25)), round(npr.normal(Y_SIZE / 2, Y_SIZE / 25)))
-        uniform_loc = (randint(0, X_SIZE), randint(0, Y_SIZE))
-        if random.choice([True, False]):
-            return centered_loc, uniform_loc
+    def generate_time(time_centered):
+        if time_centered:
+            return round(npr.poisson(SIM_TIME - MAX_DISTANCE))
         else:
-            return uniform_loc, centered_loc
+            return randint(0, SIM_TIME - MAX_DISTANCE)
+
+    @staticmethod
+    def generate_route(routes_centered):
+        if routes_centered:
+            centered_loc = (round(npr.poisson(X_SIZE / 2)), round(npr.poisson(Y_SIZE / 2)))
+            uniform_loc = (randint(0, X_SIZE), randint(0, Y_SIZE))
+            if random.choice([True, False]):
+                return centered_loc, uniform_loc
+            else:
+                return uniform_loc, centered_loc
+        else:
+            return (randint(0, X_SIZE), randint(0, Y_SIZE)), (randint(0, X_SIZE), randint(0, Y_SIZE))
+
+
+
