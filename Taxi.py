@@ -5,8 +5,9 @@ import Permute
 from Globals import *
 
 class Taxi:
-    def __init__(self, id, max_passengers):
+    def __init__(self, id, sim, max_passengers):
         self.id = id
+        self.sim = sim
         self.max_passengers = max_passengers
         self.nodes_limit = self.get_nodes_limit_from_passenger_limit(max_passengers)
         self.price_per_unit = npr.normal(1, 0.05)
@@ -135,8 +136,7 @@ class Taxi:
 
     def compute_price_per_unit(self, time):
         average_occupancy = (self.occupancy_count / time)
-        if average_occupancy > 1:
-            self.price_per_unit = (1 / average_occupancy * 1.1)
+        self.price_per_unit = (1 - average_occupancy * 0.2)
 
     def get_pairs(self):
         pairs = []

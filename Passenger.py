@@ -6,11 +6,11 @@ from Taxi import Taxi
 
 
 class Passenger:
-    def __init__(self, id, simulation, routes_centered=False, time_centered=False):
+    def __init__(self, id, simulation):
         self.id = id
         self.simulation = simulation
-        self.orig, self.dest = self.generate_route(routes_centered)
-        self.request_time = self.generate_time(time_centered)
+        self.orig, self.dest = self.generate_route()
+        self.request_time = self.generate_time()
         self.ride = False
         self.ride_price = None
         self.status = "Idle"
@@ -75,23 +75,29 @@ class Passenger:
         self.delays.append(time)
 
     def determine_travel_time(self):
-        distance = Taxi.distance(self.orig, self.dest)
-        return ((MAX_DISTANCE * 0.1) + (1.5 * distance)) / self.power
+        if self.simulation.dist_indep:
+            return float('inf')
+        else:
+            distance = Taxi.distance(self.orig, self.dest)
+            return ((MAX_DISTANCE * 0.1) + (1.5 * distance)) / self.power
 
     def determine_price(self):
-        return Taxi.distance(self.orig, self.dest) * 1.2 * self.power
+        if self.simulation.price_indep:
+            return float('inf')
+        else:
+            return Taxi.distance(self.orig, self.dest) * self.power
 
-    @staticmethod
-    def generate_time(time_centered):
-        if time_centered:
-            return round(npr.poisson(SIM_TIME - MAX_DISTANCE))
+    def generate_time(self):
+        if self.simulation.time_centered:
+            mean = (SIM_TIME - MAX_DISTANCE)/2
+            return round(npr.normal(mean, mean/4))
         else:
             return randint(0, SIM_TIME - MAX_DISTANCE)
 
-    @staticmethod
-    def generate_route(routes_centered):
-        if routes_centered:
-            centered_loc = (round(npr.poisson(X_SIZE / 2)), round(npr.poisson(Y_SIZE / 2)))
+    def generate_route(self):
+        if self.simulation.routes_centered:
+            center_x, center_y = X_SIZE/2, Y_SIZE/2
+            centered_loc = (round(npr.normal(center_x, center_x/4)), round(npr.normal(center_y, center_y/4)))
             uniform_loc = (randint(0, X_SIZE), randint(0, Y_SIZE))
             if random.choice([True, False]):
                 return centered_loc, uniform_loc
