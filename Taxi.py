@@ -7,9 +7,10 @@ from Globals import *
 class Taxi:
     def __init__(self, id, sim, max_passengers):
         self.id = id
-        self.sim = sim
+        self.simulation = sim
         self.max_passengers = max_passengers
         self.nodes_limit = self.get_nodes_limit_from_passenger_limit(max_passengers)
+        self.base_price_per_unit = 1.1
         self.price_per_unit = npr.normal(1, 0.05)
         self.x_pos = randint(0, X_SIZE)
         self.y_pos = randint(0, Y_SIZE)
@@ -136,7 +137,8 @@ class Taxi:
 
     def compute_price_per_unit(self, time):
         average_occupancy = (self.occupancy_count / time)
-        self.price_per_unit = (1 - average_occupancy * 0.2)
+        self.price_per_unit = max(0, (self.base_price_per_unit - average_occupancy *
+                                                          self.simulation.discount_multiplier))
 
     def get_pairs(self):
         pairs = []

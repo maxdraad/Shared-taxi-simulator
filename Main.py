@@ -43,7 +43,7 @@ class Simulation:
         taxi_types = len(self.capacities)
         for capacity in self.capacities:
             for x in range(round(self.n_taxi / taxi_types)):
-                taxis.append(Taxi(x, capacity))
+                taxis.append(Taxi(x, self, capacity))
         return taxis
 
     def run(self):
@@ -113,14 +113,18 @@ class Simulation:
                 stdev(commuting_times), total_distance, total_earnings, mean(total_taxi_occupancy)]
 
 def multi_sim(runs_per_setting = 5, sim_times=[SIM_TIME], n_taxis=[N_TAXI], n_passengers=[N_PASSENGERS],
-              capacities=[MAX_PASSENGERS], time_centered = [False], routes_centered = [False]):
-    combinations = list(itertools.product(sim_times, n_taxis, n_passengers, capacities, time_centered, routes_centered))
+              capacities=[MAX_PASSENGERS], discount_multipliers = [DISCOUNT_MULTIPLIER], time_centered = [False],
+              routes_centered = [False]):
+    combinations = list(itertools.product(sim_times, n_taxis, n_passengers, capacities, time_centered, routes_centered,
+                                          discount_multipliers))
     for idx, setting in enumerate(combinations):
         results, means = [], []
         for run in range(runs_per_setting):
-            print("Setting {}/{} ({}/{}), Combination: {}.".format(idx+1, len(combinations), run+1, runs_per_setting, setting))
+            print("Setting {}/{} ({}/{}), Combination: {}.".format(idx+1, len(combinations), run+1, runs_per_setting,
+                                                                   setting))
             sim = Simulation(sim_time=setting[0], n_taxi=setting[1], n_passengers=setting[2], capacities=setting[3],
-                             time_centered=setting[4], routes_centered=setting[5], print_sim_time=False)
+                             time_centered=setting[4], routes_centered=setting[5], discount_multiplier=setting[6],
+                             print_sim_time=False)
             sim.run()
             result = sim.get_results()
             results.append(result)
@@ -136,16 +140,23 @@ def multi_sim(runs_per_setting = 5, sim_times=[SIM_TIME], n_taxis=[N_TAXI], n_pa
         f.close()
 
 # Single test run
-# sim = Simulation(print_sim_time=True)
-# sim.run()
-# sim.print_results()
+sim = Simulation(print_sim_time=True, capacities=[1], n_taxi=100, discount_multiplier=0.5)
+sim.run()
+sim.print_results()
 
 # Simple multi run for testing
 # multi_sim(runs_per_setting=3, n_passengers=[50, 30],  n_taxis=[100, 80], capacities=[[1]])
 
-# Policy 1: Reduce cars and allow sharing
-multi_sim(runs_per_setting=3, n_taxis=[100, 80, 60, 40], capacities=[[1], [4], [1,2,4,8]])
+# Policy 1: Reduce cars and allow sharing (with price independency)
+# multi_sim(runs_per_setting=3, n_taxis=[100, 80, 60, 40], capacities=[[1], [4], [1,2,4,8]])
+
+# Policy 2: Reduce cost and allow sharing
+multi_sim(runs_per_setting=3, n_taxis=[80], capacities=[[1], [4]], discount_multipliers=[0, 0.2, 0.5])
+
+# Centered routes comparison (with price independency)
+# multi_sim(runs_per_setting=3, n_taxis=[80, 60], capacities=[[1], [4]], routes_centered=[True, False])
 
 
+# For profiling
 # py -m kernprof -l Main.py
 # py -m line_profiler Main.py.lprof

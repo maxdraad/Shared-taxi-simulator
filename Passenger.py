@@ -79,7 +79,7 @@ class Passenger:
             return float('inf')
         else:
             distance = Taxi.distance(self.orig, self.dest)
-            return ((MAX_DISTANCE * 0.1) + (1.5 * distance)) / self.power
+            return ((MAX_DISTANCE * 0.1) + (1.2 * distance)) / self.power
 
     def determine_price(self):
         if self.simulation.price_indep:
